@@ -1,4 +1,4 @@
-package tests;
+package RegisterApi;
 
 import org.testng.Assert;
 import org.testng.annotations.Test;

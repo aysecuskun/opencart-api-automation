@@ -1,4 +1,4 @@
-package tests;
+package LoginApi;
 
 import org.testng.Assert;
 import org.testng.annotations.Test;

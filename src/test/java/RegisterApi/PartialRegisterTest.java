@@ -1,4 +1,4 @@
-package tests;
+package RegisterApi;
 
 import static io.restassured.RestAssured.given;
 

@@ -1,4 +1,4 @@
-package tests;
+package HomeApi;
 
 import org.testng.annotations.Test;
 
