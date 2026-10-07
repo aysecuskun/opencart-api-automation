@@ -2,9 +2,9 @@
 
 API testing and automation project for **OpenCart** using **Postman, RestAssured, Java and TestNG**.
 
-This project was created to practice API testing on an e-commerce application and to automate important user, product and shopping cart flows at API level.
+This project was created to practice API testing on an e-commerce application and to automate important user, product, shopping cart and checkout flows at API level.
 
-The project started with **API exploration and manual testing in Postman**. The validated scenarios are then being converted into automated tests using **RestAssured and Java**.
+The project started with **API exploration and manual testing in Postman**. The validated scenarios were then converted into automated tests using **RestAssured and Java**.
 
 ---
 
@@ -30,15 +30,21 @@ RestAssured Automation
 TestNG Assertions
 ```
 
-The project covers different API scenarios including:
+The project covers:
 
 * User registration
 * User login
 * Authentication and token handling
 * Product search and product information
 * Shopping cart operations
-* Address-related scenarios
+* Address management
+* Shipping method selection
+* Payment method selection
+* Checkout flow
+* Order creation
 * Request and response validation
+* Session-dependent API flows
+* Positive, negative and validation scenarios
 
 ---
 
@@ -72,7 +78,9 @@ This helped identify:
 
 The identified requests were then recreated and validated in **Postman**.
 
-After validating the scenarios in Postman, the automation phase was started with **RestAssured**.
+After validating the scenarios in Postman, the automation phase was implemented using **RestAssured, Java and TestNG**.
+
+This approach helped reproduce the actual request flow used by the OpenCart application instead of treating the API endpoints as isolated requests.
 
 ---
 
@@ -112,7 +120,7 @@ POST Registration Request
 Validate Response
 ```
 
-Current scenarios include:
+Scenarios include:
 
 * Successful registration
 * Required field validation
@@ -142,7 +150,7 @@ POST Login Request
 Validate Response
 ```
 
-Current scenarios include:
+Scenarios include:
 
 * Successful login
 * Invalid email
@@ -169,7 +177,7 @@ register_token
 
 The automation retrieves these values from the corresponding GET response and uses them in the following POST request.
 
-The session cookie is also maintained between the GET and POST requests.
+The session cookie is also maintained between requests.
 
 For example:
 
@@ -195,7 +203,7 @@ The shopping cart is **session-dependent**.
 
 This means that the same session must be maintained when performing sequential cart operations.
 
-For example:
+The tested flow includes:
 
 ```text
 Add Product
@@ -209,7 +217,7 @@ Get Cart
 Remove Product
 ```
 
-During testing, different product IDs were added within the same session to verify that multiple products could belong to the same cart.
+Different product IDs were used during testing to verify that multiple products could be managed within the same shopping cart session.
 
 Example:
 
@@ -222,41 +230,179 @@ The cart API uses the OpenCart session to maintain the cart state.
 
 ---
 
-## Important API Testing Observations
+## Address API Testing
 
-### Session Dependency
+Address-related checkout operations were investigated through browser Network / Fetch-XHR requests and automated with RestAssured.
 
-Cart operations depend on the current OpenCart session.
+The tested flow includes:
 
-The session must be maintained when testing multiple sequential requests.
+```text
+Login
+   ↓
+Checkout
+   ↓
+Select Shipping Address
+   ↓
+Validate Response
+```
 
-### Dynamic Tokens
+The address selection response is validated at application level.
 
-Registration and login requests use dynamically generated tokens.
+Example:
 
-These tokens are retrieved from the preceding GET request instead of being hard-coded.
+```json
+{
+  "success": "Success: You have changed shipping address!"
+}
+```
 
-### Product ID
+The test maintains the same `OCSESSID` throughout the flow to preserve the authenticated session.
 
-The `product_id` parameter determines which product is added to the cart.
+---
+
+## Shipping Method Testing
+
+The shipping method flow was automated using the same authenticated session.
+
+The flow includes:
+
+```text
+Get Shipping Methods
+        ↓
+Validate Available Shipping Method
+        ↓
+Save Shipping Method
+        ↓
+Validate Response
+```
+
+The tested shipping option includes:
+
+```text
+Flat Shipping Rate
+```
+
+The save operation returns an application-level success response:
+
+```json
+{
+  "success": "Success: You have changed shipping method!"
+}
+```
+
+The shipping cost was also validated as part of the checkout flow.
+
+---
+
+## Payment Method Testing
+
+The payment method flow was automated after the shipping method was selected.
+
+The flow includes:
+
+```text
+Get Payment Methods
+        ↓
+Validate Available Payment Method
+        ↓
+Save Payment Method
+        ↓
+Validate Response
+```
+
+The tested payment method was:
+
+```text
+Cash On Delivery
+```
+
+The save operation returns:
+
+```json
+{
+  "success": "Success: You have changed payment method!"
+}
+```
+
+---
+
+## End-to-End Checkout & Order Creation
+
+One of the main completed scenarios is the end-to-end checkout flow.
+
+The automated flow is:
+
+```text
+Login
+   ↓
+Cart
+   ↓
+Checkout
+   ↓
+Shipping Address
+   ↓
+Shipping Method
+   ↓
+Payment Method
+   ↓
+Confirm Order
+   ↓
+Order Successfully Created
+```
+
+The test maintains the same authenticated session throughout the checkout process.
+
+The final response is validated using both HTTP status and application-level response content.
+
+The successful order response contains:
+
+```text
+Your order has been placed!
+
+Your order has been successfully processed!
+```
+
+The checkout flow was also validated with the expected order total.
 
 Example:
 
 ```text
-product_id=47
+Product: MacBook Pro
+Product Total: $2,000.00
+Shipping: $5.00
+Order Total: $2,005.00
 ```
 
-### Request Headers
+This confirms that the API automation can execute a complete e-commerce checkout flow and verify the resulting business outcome.
 
-Some OpenCart requests require specific headers.
+---
 
-For example:
+## Important API Testing Observations
+
+### Session Dependency
+
+Several OpenCart operations are session-dependent.
+
+For example, login, cart and checkout operations require maintaining the same session between sequential requests.
+
+Therefore, the automation explicitly manages the `OCSESSID` cookie when required.
+
+---
+
+### Dynamic Tokens
+
+Registration and login operations use dynamically generated tokens.
+
+These tokens are retrieved from the preceding GET response instead of being hard-coded.
+
+Examples:
 
 ```text
-X-Requested-With: XMLHttpRequest
+login_token
+register_token
 ```
 
-These requirements were identified by inspecting browser Network / Fetch-XHR requests.
+---
 
 ### HTTP Status vs Application Result
 
@@ -279,459 +425,78 @@ Therefore, the automated tests validate both:
 * HTTP status code
 * Application-level response content
 
-This is an important aspect of API testing because a successful HTTP request does not always mean that the business operation was successful.
+This is an important API testing principle because a successful HTTP request does not necessarily mean that the business operation was successful.
 
 ---
-
-## Current RestAssured Automation
-
-The RestAssured automation currently includes:
-
-```text
-Homepage
-   ↓
-Registration
-   ├── Successful registration
-   └── Validation scenarios
-   ↓
-Login
-   ├── Successful login
-   ├── Invalid email
-   ├── Invalid password
-   └── Blank credentials
-```
-
-The tests are implemented using **RestAssured + TestNG**.
-
-The project currently uses `Response` objects to store API responses and then validates status codes and response bodies through TestNG assertions.
-
-Example approach:
-
-```java
-Response response =
-    given()
-    .when()
-        .get(url);
-
-Assert.assertEquals(response.getStatusCode(), 200);
-Assert.assertTrue(response.getBody().asString().contains("expected content"));
-```
-
----
-
-## Postman Collection
-
-The `postman/` directory contains the Postman collection created during the API exploration and manual testing phase.
-
-The Postman collection is used as the starting point for the RestAssured automation.
-
-This creates a clear progression:
-
-```text
-Postman
-   ↓
-Validated API Scenarios
-   ↓
-RestAssured
-   ↓
-Automated API Tests
-```
-
----
-
-## Test Data
-
-The `test-data/` directory contains the API test scenario documentation used during the project.
-
-The test scenarios cover positive, negative and validation cases for the OpenCart API.
-
----
-
-## Project Structure
-
-Current project structure:
-
-```text
-opencart-api-automation
-│
-├── postman
-│   └── OpenCart API Automation.postman_collection.json
-│
-├── test-data
-│   ├── API_Test_Scenarios..xlsx
-│   └── .gitkeep
-│
-├── screenshots
-│   ├── Loginpostsuccess.png
-│   └── registerapisuccess.png
-│
-├── src
-│   └── test
-│       └── java
-│           └── tests
-│               ├── HomepageTest.java
-│               ├── RegisterPageTest.java
-│               ├── RegisterPostTest.java
-│               ├── PartialRegisterTest.java
-│               ├── LoginPageTest.java
-│               └── LoginPostTest.java
-│
-├── pom.xml
-├── .gitignore
-└── README.md
-```
-
----
-
-## Automation Roadmap
-
-### Completed
-
-* [x] OpenCart API exploration
-* [x] Browser Network / Fetch-XHR analysis
-* [x] API request identification
-* [x] API requests recreated in Postman
-* [x] Registration scenarios in Postman
-* [x] Login scenarios in Postman
-* [x] Authentication and token investigation
-* [x] Product API investigation
-* [x] Shopping cart API investigation
-* [x] Address API investigation
-* [x] Maven project setup
-* [x] RestAssured dependency integration
-* [x] TestNG integration
-* [x] Homepage GET automation
-* [x] Registration GET automation
-* [x] Registration POST automation
-* [x] Registration validation scenarios
-* [x] Login GET automation
-* [x] Login POST automation
-* [x] Login negative scenarios
-* [x] Session and dynamic token handling
-* [x] Response-based assertions
-
-### Next Steps
-
-* [ ] Automate product search scenarios with RestAssured
-* [ ] Automate product detail scenarios
-* [ ] Automate add-to-cart scenarios
-* [ ] Automate cart update scenarios
-* [ ] Automate get-cart scenarios
-* [ ] Automate remove-from-cart scenarios
-* [ ] Automate address scenarios
-* [ ] Improve reusable request/session handling
-* [ ] Improve test data management
-* [ ] Add reusable authentication handling
-* [ ] Improve project structure
-* [ ] Add API test reporting
-* [ ] Integrate the project with CI/CD
-
----
-
-## Related UI Automation Projects
-
-This API automation project is part of a broader OpenCart testing portfolio.
-
-Other projects include:
-
-* Selenium WebDriver automation
-* Playwright automation
-* API testing with Postman
-* API automation with RestAssured
-
-The goal is to demonstrate testing at different layers of an application:
-
-```text
-UI Testing
-├── Selenium
-└── Playwright
-
-API Testing
-├── Postman
-└── RestAssured
-```
-
----
-
-## Author
-
-**Ayşe Cuşkun**
-
-Software Test Engineer | Manual Testing | Test Automation | API Testing
-
----
-
-# 🇹🇷 Türkçe
-
-## Proje Hakkında
-
-Bu proje, **OpenCart** e-ticaret uygulamasının API'lerini test etmek ve otomasyonunu geliştirmek amacıyla oluşturulmuştur.
-
-Proje başlangıçta **Postman ile API keşfi ve manuel API testleri** yapılarak geliştirilmiş, doğrulanan senaryolar daha sonra **Java, RestAssured ve TestNG** kullanılarak otomasyona aktarılmaya başlanmıştır.
-
-Projenin temel yaklaşımı:
-
-```text
-Browser Network Analizi
-        ↓
-API Request'lerin Belirlenmesi
-        ↓
-Postman ile Test
-        ↓
-Test Senaryolarının Doğrulanması
-        ↓
-RestAssured Otomasyonu
-        ↓
-TestNG Assertion'ları
-```
-
----
-
-## Kullanılan Teknolojiler
-
-* **Java 17** – Otomasyon dili
-* **RestAssured 6.0.1** – API otomasyonu
-* **TestNG 7.12.0** – Test çalıştırma ve assertion
-* **Maven** – Dependency ve proje yönetimi
-* **Postman** – API keşfi ve manuel API testleri
-* **Git & GitHub** – Versiyon kontrolü
-* **OpenCart** – Test edilen uygulama
-* **Eclipse** – Geliştirme ortamı
-
----
-
-## API Test Yaklaşımı
-
-API istekleri öncelikle tarayıcının **Network / Fetch-XHR** bölümünden incelenmiştir.
-
-Bu analiz sırasında:
-
-* Request URL
-* HTTP method
-* Query parametreleri
-* Request body
-* Headers
-* Cookie / session bilgileri
-* Dinamik token'lar
-* Response verileri
-
-incelenmiştir.
-
-Daha sonra bu istekler Postman'de yeniden oluşturularak test edilmiştir.
-
-Postman'de doğrulanan senaryoların RestAssured ve Java ile otomasyonu gerçekleştirilmektedir.
-
----
-
-## API Test Senaryoları
-
-### 1. Homepage
-
-**GET**
-
-OpenCart ana sayfa endpoint'i RestAssured kullanılarak test edilmektedir.
-
-Kontroller:
-
-* HTTP status code
-* Response body
-* Beklenen sayfa içeriği
-
----
-
-### 2. Kullanıcı Kaydı
-
-**GET + POST**
-
-Kullanıcı kayıt işlemi öncesinde registration sayfasına GET isteği gönderilmektedir.
-
-Bu istek sonucunda session bilgisi ve dinamik registration token alınmaktadır.
-
-Akış:
-
-```text
-GET Registration Page
-        ↓
-OCSESSID alınır
-        ↓
-register_token alınır
-        ↓
-POST Registration
-        ↓
-Response doğrulanır
-```
-
-Mevcut senaryolar:
-
-* Başarılı kayıt
-* Zorunlu alan validasyonları
-* Hatalı kayıt verileri
-* Registration response kontrolü
-* Session ve token yönetimi
-
----
-
-### 3. Kullanıcı Girişi
-
-**GET + POST**
-
-Login işlemi öncesinde login sayfasına GET isteği gönderilmektedir.
-
-Akış:
-
-```text
-GET Login Page
-        ↓
-OCSESSID alınır
-        ↓
-login_token alınır
-        ↓
-POST Login
-        ↓
-Response doğrulanır
-```
-
-Mevcut senaryolar:
-
-* Başarılı login
-* Hatalı email
-* Hatalı password
-* Boş email
-* Boş password
-* Login response kontrolü
-* Session ve token yönetimi
-
----
-
-## Authentication ve Token Yönetimi
-
-OpenCart login ve registration işlemlerinde dinamik token'lar kullanmaktadır.
-
-Örneğin:
-
-```text
-login_token
-register_token
-```
-
-Bu değerler GET isteğinin response body'sinden alınarak POST isteğinde kullanılmaktadır.
-
-Aynı zamanda GET ve POST arasında session cookie korunmaktadır.
-
-Genel akış:
-
-```text
-GET
-  ↓
-OCSESSID
-+
-login_token / register_token
-  ↓
-POST
-  ↓
-Response validation
-```
-
-Bu yöntem sayesinde otomasyon, uygulamanın gerçek request akışını taklit etmektedir.
-
----
-
-## Sepet Testleri
-
-OpenCart sepet işlemlerinin **session-dependent** olduğu gözlemlenmiştir.
-
-Yani birden fazla sepet işlemini test ederken aynı session'ın korunması gerekmektedir.
-
-Örneğin:
-
-```text
-Ürün Ekle
-      ↓
-Başka Ürün Ekle
-      ↓
-Miktarı Güncelle
-      ↓
-Sepeti Getir
-      ↓
-Ürünü Sil
-```
-
-Aynı session içerisinde farklı ürünlerin sepete eklenmesi test edilmiştir.
-
-Örnek:
-
-```text
-Product ID: 44
-Product ID: 40
-```
-
-Bu sayede birden fazla ürünün aynı shopping cart session'ı içerisinde yönetilebildiği doğrulanmıştır.
-
----
-
-## API Testlerinde Önemli Gözlemler
-
-### Session Dependency
-
-Sepet işlemleri mevcut OpenCart session'ına bağlıdır.
-
-Bu nedenle ardışık API isteklerinde session bilgisinin korunması gerekir.
-
-### Dynamic Token
-
-Registration ve login işlemlerinde dinamik token'lar kullanılmaktadır.
-
-Token'lar sabit olarak yazılmak yerine önceki GET response'undan alınmaktadır.
-
-### Product ID
-
-Sepete hangi ürünün ekleneceğini `product_id` belirlemektedir.
-
-Örnek:
-
-```text
-product_id=47
-```
 
 ### Request Headers
 
-Bazı OpenCart API isteklerinde özel header'lar gerekmektedir.
+Some OpenCart requests require specific headers.
 
-Örneğin:
+For example:
 
 ```text
 X-Requested-With: XMLHttpRequest
 ```
 
-Bu gereksinimler tarayıcı Network / Fetch-XHR istekleri incelenerek belirlenmiştir.
-
-### HTTP Status Code ve Business Result Farkı
-
-API testleri sırasında önemli bir nokta gözlemlenmiştir:
-
-Bir işlem başarısız olsa bile HTTP status code `200` olabilir.
-
-Örneğin hatalı login isteği:
-
-```text
-200 OK
-```
-
-dönerken response body içerisinde:
-
-```text
-Warning: No match for E-Mail Address and/or Password.
-```
-
-mesajı bulunabilmektedir.
-
-Bu nedenle testlerde yalnızca HTTP status code değil, **response body içerisindeki application-level sonuçlar da** kontrol edilmektedir.
+These requirements were identified by inspecting browser Network / Fetch-XHR requests.
 
 ---
 
-## Mevcut RestAssured Otomasyonu
+### OpenCart Uses POST for Some Update and Remove Operations
 
-RestAssured tarafında şu anda:
+An important API design observation was identified during testing.
+
+Although conventional RESTful API design commonly uses:
+
+```text
+PUT / PATCH → Update
+DELETE      → Delete
+```
+
+some OpenCart operations use:
+
+```text
+POST → Update
+POST → Remove
+```
+
+For example, shopping cart update and remove operations were implemented using POST requests.
+
+This was treated as an **application-specific API design choice**, not as an automation error.
+
+This observation demonstrates the importance of testing the actual API contract of the application rather than assuming that every endpoint follows conventional REST semantics.
+
+---
+
+### Response-Based Testing
+
+The project uses `Response` objects to inspect API responses before performing assertions.
+
+Example:
+
+```java
+Response response =
+    given()
+    .when()
+        .get(url);
+
+Assert.assertEquals(response.getStatusCode(), 200);
+
+Assert.assertTrue(
+    response.getBody()
+        .asString()
+        .contains("expected content")
+);
+```
+
+This approach allows the tests to validate both technical response information and business-level results.
+
+---
+
+## Completed RestAssured Automation
+
+The RestAssured automation covers the following areas:
 
 ```text
 Homepage
@@ -745,170 +510,20 @@ Login
    ├── Invalid email
    ├── Invalid password
    └── Blank credentials
-```
-
-senaryoları otomatikleştirilmiştir.
-
-Testler **RestAssured + TestNG** kullanılarak yazılmıştır.
-
-API response'ları `Response` değişkenlerinde tutularak daha sonra TestNG assertion'ları ile kontrol edilmektedir.
-
-Örneğin:
-
-```java
-Response response =
-    given()
-    .when()
-        .get(url);
-
-Assert.assertEquals(response.getStatusCode(), 200);
-Assert.assertTrue(response.getBody().asString().contains("expected content"));
-```
-
----
-
-## Postman Collection
-
-`postman/` klasörü API keşfi ve manuel test aşamasında oluşturulan Postman collection'ını içermektedir.
-
-Postman collection, RestAssured otomasyonunun başlangıç noktası olarak kullanılmaktadır.
-
-Projenin yaklaşımı:
-
-```text
-Postman
    ↓
-Doğrulanmış API Senaryoları
+Shopping Cart
+   ├── Add product
+   ├── Get cart
+   ├── Update cart
+   └── Remove product
    ↓
-RestAssured
+Address
+   └── Select shipping address
    ↓
-Otomatik API Testleri
+Checkout
+   ├── Shipping method
+   ├── Payment method
+   └── Order creation
 ```
 
----
-
-## Test Data
-
-`test-data/` klasörü API test senaryolarının dokümantasyonunu içermektedir.
-
-Senaryolarda:
-
-* Positive testler
-* Negative testler
-* Validation testleri
-
-yer almaktadır.
-
----
-
-## Proje Yapısı
-
-Mevcut proje yapısı:
-
-```text
-opencart-api-automation
-│
-├── postman
-│   └── OpenCart API Automation.postman_collection.json
-│
-├── test-data
-│   ├── API_Test_Scenarios..xlsx
-│   └── .gitkeep
-│
-├── screenshots
-│   ├── Loginpostsuccess.png
-│   └── registerapisuccess.png
-│
-├── src
-│   └── test
-│       └── java
-│           └── tests
-│               ├── HomepageTest.java
-│               ├── RegisterPageTest.java
-│               ├── RegisterPostTest.java
-│               ├── PartialRegisterTest.java
-│               ├── LoginPageTest.java
-│               └── LoginPostTest.java
-│
-├── pom.xml
-├── .gitignore
-└── README.md
-```
-
----
-
-## Otomasyon Yol Haritası
-
-### Tamamlananlar
-
-* [x] OpenCart API keşfi
-* [x] Browser Network / Fetch-XHR analizi
-* [x] API request'lerinin belirlenmesi
-* [x] API request'lerinin Postman'de oluşturulması
-* [x] Registration senaryoları
-* [x] Login senaryoları
-* [x] Authentication ve token araştırması
-* [x] Product API araştırması
-* [x] Shopping cart API araştırması
-* [x] Address API araştırması
-* [x] Maven projesinin oluşturulması
-* [x] RestAssured dependency entegrasyonu
-* [x] TestNG entegrasyonu
-* [x] Homepage GET otomasyonu
-* [x] Registration GET otomasyonu
-* [x] Registration POST otomasyonu
-* [x] Registration validation senaryoları
-* [x] Login GET otomasyonu
-* [x] Login POST otomasyonu
-* [x] Login negative senaryoları
-* [x] Session ve dinamik token yönetimi
-* [x] Response-based assertion'lar
-
-### Sıradaki Adımlar
-
-* [ ] Product search senaryolarını RestAssured ile otomatikleştirmek
-* [ ] Product detail senaryolarını otomatikleştirmek
-* [ ] Add-to-cart senaryolarını otomatikleştirmek
-* [ ] Cart update senaryolarını otomatikleştirmek
-* [ ] Get-cart senaryolarını otomatikleştirmek
-* [ ] Remove-from-cart senaryolarını otomatikleştirmek
-* [ ] Address senaryolarını otomatikleştirmek
-* [ ] Reusable request/session yapısını geliştirmek
-* [ ] Test data yönetimini geliştirmek
-* [ ] Reusable authentication handling eklemek
-* [ ] Proje yapısını geliştirmek
-* [ ] API test reporting eklemek
-* [ ] CI/CD entegrasyonu
-
----
-
-## İlgili UI Automation Projeleri
-
-Bu API otomasyon projesi, daha geniş OpenCart test otomasyon portföyünün bir parçasıdır.
-
-Diğer projeler:
-
-* Selenium WebDriver automation
-* Playwright automation
-* Postman API testing
-* RestAssured API automation
-
-Amaç, uygulamanın farklı test katmanlarında deneyim göstermektir:
-
-```text
-UI Testing
-├── Selenium
-└── Playwright
-
-API Testing
-├── Postman
-└── RestAssured
-```
-
----
-
-## Yazar
-
-**Ayşe Cuşkun**
-
-Software Test Engineer | Manual Testing | Test Automation | API Testing
+The tests are implemen
